@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Recordatorios</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        async function addReminder(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const data = {
+                content: formData.get('content'),
+                important: formData.get('important') === 'on'
+            };
+
+            const response = await fetch("/api/reminders/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": formData.get('csrfmiddlewaretoken')
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) window.location.reload();
+            else alert("Error al agregar");
+        }
+
+        async function deleteReminder(id) {
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+            if (!confirm("Eliminar")) return;
+
+            const response = await fetch(`/api/reminders/${id}/delete/`, {
+                method: "DELETE",
+                headers: {
+                    "X-CSRFToken": csrfToken
+                }
+            });
+
+            if (response.ok) window.location.reload();
+            else alert("Error al eliminar");
+        }
+
+        function enableEdit(id) {
+            document.querySelectorAll('.edit-mode').forEach(div => div.style.display = 'none');
+            document.querySelectorAll('.view-mode').forEach(div => div.style.display = 'block');
+
+            const li = document.getElementById(`reminder-${id}`);
+            li.querySelector('.view-mode').style.display = 'none';
+            li.querySelector('.edit-mode').style.display = 'block';
+        }
+
+        async function saveEdit(id) {
+            const form = document.getElementById(`edit-form-${id}`);
+            const formData = new FormData(form);
+            const data = {
+                content: formData.get('content'),
+                important: formData.get('important') === 'on'
+            };
+
+            const response = await fetch(`/api/reminders/${id}/`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": formData.get('csrfmiddlewaretoken')
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) window.location.reload();
+            else alert("Error al guardar");
+        }
+    </script>
+</head>
+
+<body>
+    <h1>Recordatorios</h1>
+
+    <form onsubmit="addReminder(event)">
+        {% csrf_token %}
+        <input type="text" name="content" maxlength="120" required>
+        <label>
+            <input type="checkbox" name="important">
+            Importante
+        </label>
+        <button type="submit">Agregar</button>
+    </form>
+
+    <ul>
+        {% for r in reminders %}
+        <li id="reminder-{{ r.id }}">
+            <div class="view-mode">
+                {{ r.content }}
+                {% if r.important %}<strong>(Importante)</strong>{% endif %}
+                <small>Creado: {{ r.created_at|date:"d/m/Y H:i" }}</small>
+                <button onclick="enableEdit('{{ r.id }}')">Editar</button>
+                <button onclick="deleteReminder('{{ r.id }}')">Eliminar</button>
+            </div>
+
+            <div class="edit-mode" style="display: none;">
+                <form id="edit-form-{{ r.id }}" onsubmit="saveEdit('{{ r.id }}'); return false;">
+                    {% csrf_token %}
+                    <input type="text" name="content" value="{{ r.content }}" required>
+                    <label>
+                        <input type="checkbox" name="important" {% if r.important %}checked{% endif %}>
+                        Importante
+                    </label>
+                    <button type="submit">Guardar</button>
+                    <button type="button" onclick="window.location.reload()">Cancelar</button>
+                </form>
+            </div>
+        </li>
+        {% empty %}
+            <li>No hay recordatorios.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
